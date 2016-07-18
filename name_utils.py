@@ -3,14 +3,27 @@ import unicodedata
 from translitua import translit, RussianInternationalPassport
 from string import capwords
 
-APOSTROPHES = "'’ʼ`""*"  # All kind of used apostrophes, including weird ones
+APOSTROPHES = "'’ʼ`\"*"  # All kind of used apostrophes, including weird ones
 DASHES = "-–—‒―"  # Commonly used dashes (full list can be found here http://www.fileformat.info/info/unicode/category/Pd/list.htm)
+YO_CHARACTER = "Ёё"
 
-CYR_SPECIFIC_CHARSET = "а-яіїєґ"
+CYR_SPECIFIC_CHARSET = "а-яіїєґё"
 CYR_CHARSET = CYR_SPECIFIC_CHARSET + re.escape(APOSTROPHES) + re.escape(DASHES)
 UKR_SPECIFIC_CHARSET = "іїєґ"
 ENG_SPECIFIC_CHARSET = "a-z"
 ENG_CHARSET = ENG_SPECIFIC_CHARSET + re.escape(APOSTROPHES) + re.escape(DASHES)
+
+HAS_CYR_RX = re.compile("[%s+]" % CYR_SPECIFIC_CHARSET, re.UNICODE)
+HAS_UKR_RX = re.compile("[%s]+" % UKR_SPECIFIC_CHARSET, re.UNICODE)
+HAS_ENG_RX = re.compile("[%s]+" % ENG_SPECIFIC_CHARSET, re.UNICODE)
+
+IS_ENG_RX = re.compile("^[%s]+$" % ENG_CHARSET, re.UNICODE)
+IS_ENG_AND_SPACES_RX = re.compile("^[%s\s]+$" % ENG_CHARSET, re.UNICODE)
+IS_CYR_RX = re.compile("^[%s]+$" % CYR_CHARSET, re.UNICODE)
+IS_CYR_AND_SPACES_RX = re.compile("^[%s\s]+$" % CYR_CHARSET, re.UNICODE)
+
+APOSTROPHE_RX = re.compile("[%s]" % re.escape(APOSTROPHES), re.UNICODE)
+DASHES_RX = re.compile("[\s%s]+" % re.escape(DASHES), re.UNICODE)
 
 
 def convert_table(table):
@@ -106,6 +119,10 @@ CYR_TO_ENG = convert_table(add_uppercase({
     "х": "х",
 }))
 
+YO_TO_E = convert_table(add_uppercase({
+    "ё": "е",
+}))
+
 
 def title(s):
     """
@@ -154,9 +171,8 @@ def has_cyr(name):
     True
     """
     return re.search(
-        "[%s+]" % CYR_SPECIFIC_CHARSET,
-        deaccent(name.lower()),
-        re.UNICODE) is not None
+        HAS_CYR_RX,
+        name.lower()) is not None
 
 
 def has_ukr(name):
@@ -171,9 +187,8 @@ def has_ukr(name):
     False
     """
     return re.search(
-        "[%s]+" % UKR_SPECIFIC_CHARSET,
-        name.lower(),
-        re.UNICODE) is not None
+        HAS_UKR_RX,
+        name.lower()) is not None
 
 
 def has_eng(name):
@@ -190,9 +205,8 @@ def has_eng(name):
     True
     """
     return re.search(
-        "[%s]+" % ENG_SPECIFIC_CHARSET,
-        name.lower(),
-        re.UNICODE) is not None
+        HAS_ENG_RX,
+        name.lower()) is not None
 
 
 def is_cyr(name, include_spaces=False):
@@ -217,14 +231,13 @@ def is_cyr(name, include_spaces=False):
     True
     """
     if include_spaces:
-        rgx = "^[%s\s]+$" % CYR_CHARSET
+        rgx = IS_CYR_AND_SPACES_RX
     else:
-        rgx = "^[%s]+$" % CYR_CHARSET
+        rgx = IS_CYR_RX
 
     return re.search(
         rgx,
-        name.lower(),
-        re.UNICODE) is not None
+        name.lower()) is not None
 
 
 def is_eng(name, include_spaces=False):
@@ -253,14 +266,13 @@ def is_eng(name, include_spaces=False):
     True
     """
     if include_spaces:
-        rgx = "^[%s\s]+$" % ENG_CHARSET
+        rgx = IS_ENG_AND_SPACES_RX
     else:
-        rgx = "^[%s]+$" % ENG_CHARSET
+        rgx = IS_ENG_RX
 
     return re.search(
         rgx,
-        deaccent(name.lower()),
-        re.UNICODE) is not None
+        deaccent(name.lower())) is not None
 
 
 def convert_eng_to_cyr(name):
@@ -371,12 +383,32 @@ def normalize_alphabets(chunk):
     return tranliterate_all_the_things(chunk)
 
 
+def normalize_charset(term):
+    """
+    Basic normalisation of the input data.
+
+    Convert various kinds of apostrophes to common one
+    Convert ё to е
+
+    >>> normalize_charset("a'b’vʼg`d\\"e*yo") == "a\'b\'v\'g\'d\'e\'yo"
+    True
+    >>> normalize_charset("ЕЁиеё") == "ЕЕиее"
+    True
+
+    """
+    return re.sub(APOSTROPHE_RX, "'",
+                  term.translate(YO_TO_E))
+
+
 def parse_fullname(person_name):
     """
     Parse input name and return a list of normalized tokens.
 
     >>> parse_fullname("іванна орестівна климпуш-цинцадзе")
     ['Іванна', 'Орестівна', 'Климпуш', 'Цинцадзе']
+
+    >>> parse_fullname("Ёвлamпій Ті`хії")
+    ['Евлампій', "Ті\'хії"]
     """
     # Extra care for initials (especialy those without space)
     person_name = re.sub("\s+", " ",
@@ -386,9 +418,10 @@ def parse_fullname(person_name):
                          replace(",", ". "))
 
     chunks = re.split(
-        "[\s%s]+" % re.escape(DASHES),
+        DASHES_RX,
         person_name.strip().lower())
 
+    chunks = map(normalize_charset, chunks)
     chunks = map(normalize_alphabets, chunks)
     chunks = map(title, chunks)
     return list(chunks)
