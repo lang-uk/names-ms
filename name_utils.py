@@ -1,5 +1,6 @@
 import re
 import unicodedata
+from translitua import translit, RussianInternationalPassport
 from string import capwords
 
 APOSTROPHES = "'’ʼ`""*"  # All kind of used apostrophes, including weird ones
@@ -10,6 +11,100 @@ CYR_CHARSET = CYR_SPECIFIC_CHARSET + re.escape(APOSTROPHES) + re.escape(DASHES)
 UKR_SPECIFIC_CHARSET = "іїєґ"
 ENG_SPECIFIC_CHARSET = "a-z"
 ENG_CHARSET = ENG_SPECIFIC_CHARSET + re.escape(APOSTROPHES) + re.escape(DASHES)
+
+
+def convert_table(table):
+    """
+    Prepare table for str.translate method.
+
+    Borrowed from https://github.com/dchaplinsky/translit-ua project
+    >>> print(1072 in convert_table({"а": "a"}))
+    True
+    >>> print(1073 in convert_table({"а": "a"}))
+    False
+    >>> print(convert_table({"а": "a"})[1072] == "a")
+    True
+    >>> print(len(convert_table({"а": "a"}).keys()) == 1)
+    True
+    """
+    return dict((ord(k), v) for k, v in table.items())
+
+
+def add_uppercase(table):
+    """
+    Extend the table with uppercase options.
+
+    Again, borrowed from https://github.com/dchaplinsky/translit-ua project
+    >>> print("а" in add_uppercase({"а": "a"}))
+    True
+    >>> print(add_uppercase({"а": "a"})["а"] == "a")
+    True
+    >>> print("А" in add_uppercase({"а": "a"}))
+    True
+    >>> print(add_uppercase({"а": "a"})["А"] == "A")
+    True
+    >>> print(len(add_uppercase({"а": "a"}).keys()))
+    2
+    >>> print("Аа" in add_uppercase({"аа": "aa"}))
+    True
+    >>> print(add_uppercase({"аа": "aa"})["Аа"] == "Aa")
+    True
+    """
+    orig = table.copy()
+    orig.update(
+        dict((k.capitalize(), v.capitalize()) for k, v in table.items()))
+
+    return orig
+
+SPECIAL_TO_CYR = convert_table({
+    "1": "і",
+    "|": "і",
+    "3": "з",
+    "0": "о",
+    "4": "ч"
+})
+
+SPECIAL_TO_ENG = convert_table({
+    "1": "l",
+    "|": "l",
+    "0": "o"
+})
+
+ENG_TO_CYR = convert_table(add_uppercase({
+    "a": "а",
+    "i": "і",
+    "e": "е",
+    "o": "о",
+    "y": "у",
+    "p": "р",
+    "k": "к",
+    "b": "в",
+    "m": "м",
+    "c": "с",
+    "u": "и",
+    "t": "т",
+    "h": "н",
+    "l": "і",
+    "х": "х",
+}))
+
+CYR_TO_ENG = convert_table(add_uppercase({
+    "а": "a",
+    "і": "i",
+    "е": "e",
+    "о": "o",
+    "у": "y",
+    "р": "p",
+    "к": "k",
+    "в": "b",
+    "м": "m",
+    "с": "c",
+    "и": "u",
+    "т": "t",
+    "н": "h",
+    "і": "l",
+    "х": "х",
+}))
 
 
 def title(s):
@@ -168,14 +263,103 @@ def is_eng(name, include_spaces=False):
         re.UNICODE) is not None
 
 
+def convert_eng_to_cyr(name):
+    """
+    Try to convert latin characters to cyrilic that looks similar.
+
+    >>> convert_eng_to_cyr("PomaH")
+    'РомаН'
+    """
+    return name.translate(ENG_TO_CYR)
+
+
+def convert_cyr_to_eng(name):
+    """
+    Try to convert cyrillic characters to latin that looks similar.
+
+    >>> convert_cyr_to_eng("Аdам")
+    'Adam'
+    """
+    return name.translate(CYR_TO_ENG)
+
+
+def convert_special_chars_to_cyr(name):
+    """
+    Try to convert special characters to cyrillic that looks similar.
+
+    >>> convert_special_chars_to_cyr("3оя")
+    'зоя'
+    """
+    return name.translate(SPECIAL_TO_CYR)
+
+
+def convert_special_chars_to_eng(name):
+    """
+    Try to convert special characters to cyrillic that looks similar.
+
+    >>> convert_special_chars_to_eng("e11i0t")
+    'elliot'
+    """
+    return name.translate(SPECIAL_TO_ENG)
+
+
+def tranliterate_all_the_things(name):
+    """
+    Transliterate both russian and Ukrainian characters to latin.
+
+    This is our last hope to deal with mixed alphabets
+    >>> tranliterate_all_the_things("bэdtєd і тыква")
+    'bedtied i tykva'
+    """
+    return translit(translit(name), RussianInternationalPassport)
+
+
 def normalize_alphabets(chunk):
     """
     Try to normalize names written in mixed alphabets (cyr+eng+special chars).
 
     For example, 01eg
+
+    >>> normalize_alphabets("Adam")
+    'Adam'
+    >>> normalize_alphabets("Петро")
+    'Петро'
+    >>> normalize_alphabets("0leg")
+    'oleg'
+    >>> normalize_alphabets("3оя")
+    'зоя'
+    >>> normalize_alphabets("3oя")
+    'зоя'
     """
-    # TODO: implement
-    return chunk
+    # Massage data a bit: replace numbers and special characters with look
+    # alike characters from alphabet
+    cyr_candidate = convert_special_chars_to_cyr(chunk)
+
+    # if chunk contains only characters of one alphabet — return it as it.
+    if is_cyr(cyr_candidate):
+        return cyr_candidate
+
+    eng_candidate = convert_special_chars_to_eng(chunk)
+    if is_eng(eng_candidate):
+        return eng_candidate
+
+    # if chunk contains mixed alphabets
+    if has_eng(chunk) and has_cyr(chunk):
+
+        # Try to replace eng characters with similar cyr
+        cyr_candidate = convert_eng_to_cyr(chunk)
+
+        # Did it help?
+        if is_cyr(cyr_candidate):
+            return cyr_candidate
+
+        # Try to replace cyr characters with similar eng
+        eng_candidate = convert_cyr_to_eng(chunk)
+        if is_eng(eng_candidate):
+            return eng_candidate
+
+    # No more chances? Transliterate everything to latin
+    return tranliterate_all_the_things(chunk)
 
 
 def parse_fullname(person_name):
@@ -192,7 +376,10 @@ def parse_fullname(person_name):
                          replace("\xa0", " ").
                          replace(",", ". "))
 
-    chunks = re.split("[\s%s]+" % re.escape(DASHES), person_name.strip())
+    chunks = re.split(
+        "[\s%s]+" % re.escape(DASHES),
+        person_name.strip().lower())
+
     chunks = map(normalize_alphabets, chunks)
     chunks = map(title, chunks)
     return list(chunks)
