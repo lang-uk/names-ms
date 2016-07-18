@@ -270,7 +270,7 @@ def convert_eng_to_cyr(name):
     >>> convert_eng_to_cyr("PomaH")
     'РомаН'
     """
-    return name.translate(ENG_TO_CYR)
+    return convert_special_chars_to_cyr(name).translate(ENG_TO_CYR)
 
 
 def convert_cyr_to_eng(name):
@@ -280,7 +280,7 @@ def convert_cyr_to_eng(name):
     >>> convert_cyr_to_eng("Аdам")
     'Adam'
     """
-    return name.translate(CYR_TO_ENG)
+    return convert_special_chars_to_eng(name).translate(CYR_TO_ENG)
 
 
 def convert_special_chars_to_cyr(name):
@@ -326,10 +326,20 @@ def normalize_alphabets(chunk):
     'Петро'
     >>> normalize_alphabets("0leg")
     'oleg'
-    >>> normalize_alphabets("3оя")
+    >>> normalize_alphabets("3оя")  # 3 (number) instead of З
     'зоя'
-    >>> normalize_alphabets("3oя")
+    >>> normalize_alphabets("3oя")  # latin o
     'зоя'
+    >>> normalize_alphabets("3oя")  # 3 and latin o
+    'зоя'
+    >>> normalize_alphabets("E11iot")  # numbers instead of l
+    'Elliot'
+    >>> normalize_alphabets("Elliоt")  # cyrilic o
+    'Elliot'
+    >>> normalize_alphabets("E||iоt")  # cyrilic o and special characters
+    'Elliot'
+    >>> normalize_alphabets("Pетro")  # Weird mix — transliterate!
+    'Petro'
     """
     # Massage data a bit: replace numbers and special characters with look
     # alike characters from alphabet
@@ -345,6 +355,10 @@ def normalize_alphabets(chunk):
 
     # if chunk contains mixed alphabets
     if has_eng(chunk) and has_cyr(chunk):
+        # Try to replace cyr characters with similar eng
+        eng_candidate = convert_cyr_to_eng(chunk)
+        if is_eng(eng_candidate):
+            return eng_candidate
 
         # Try to replace eng characters with similar cyr
         cyr_candidate = convert_eng_to_cyr(chunk)
@@ -352,11 +366,6 @@ def normalize_alphabets(chunk):
         # Did it help?
         if is_cyr(cyr_candidate):
             return cyr_candidate
-
-        # Try to replace cyr characters with similar eng
-        eng_candidate = convert_cyr_to_eng(chunk)
-        if is_eng(eng_candidate):
-            return eng_candidate
 
     # No more chances? Transliterate everything to latin
     return tranliterate_all_the_things(chunk)

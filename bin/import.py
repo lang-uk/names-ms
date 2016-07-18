@@ -36,6 +36,7 @@ if __name__ == '__main__':
     accum = []
     total_lines = 0
     with open(input_fname, encoding="utf-8") as input_fp:
+        # TODO: support for ё
         for i, line in enumerate(input_fp):
             accum.append(loads(line))
             if len(accum) >= 10000:
