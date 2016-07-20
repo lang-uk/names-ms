@@ -5,6 +5,7 @@ from string import capwords
 
 APOSTROPHES = "'’ʼ`\"*"  # All kind of used apostrophes, including weird ones
 DASHES = "-–—‒―"  # Commonly used dashes (full list can be found here http://www.fileformat.info/info/unicode/category/Pd/list.htm)
+BRACKETS = "[](){}"
 YO_CHARACTER = "Ёё"
 
 CYR_SPECIFIC_CHARSET = "а-яіїєґё"
@@ -23,7 +24,7 @@ IS_CYR_RX = re.compile("^[%s]+$" % CYR_CHARSET, re.UNICODE)
 IS_CYR_AND_SPACES_RX = re.compile("^[%s\s]+$" % CYR_CHARSET, re.UNICODE)
 
 APOSTROPHE_RX = re.compile("[%s]" % re.escape(APOSTROPHES), re.UNICODE)
-DASHES_RX = re.compile("[\s%s]+" % re.escape(DASHES), re.UNICODE)
+TOKENIZE_RX = re.compile("[\s%s]+" % re.escape(DASHES + BRACKETS), re.UNICODE)
 
 
 def convert_table(table):
@@ -409,6 +410,8 @@ def parse_fullname(person_name):
 
     >>> parse_fullname("Ёвлamпій Ті`хії")
     ['Евлампій', "Ті\'хії"]
+    >>> parse_fullname("Нездимовська (Медушевська) Анна Олексіївна")
+    ['Нездимовська', 'Медушевська', 'Анна', 'Олексіївна']
     """
     # Extra care for initials (especialy those without space)
     person_name = re.sub("\s+", " ",
@@ -418,7 +421,7 @@ def parse_fullname(person_name):
                          replace(",", ". "))
 
     chunks = re.split(
-        DASHES_RX,
+        TOKENIZE_RX,
         person_name.strip().lower())
 
     chunks = map(normalize_charset, chunks)
