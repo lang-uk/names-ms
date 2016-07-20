@@ -47,7 +47,7 @@ class NameVariant(DocType):
         # TODO: THROW IT AWAY AND REPLACE WITH DAWG
         def search_clause(term):
             # TODO: case for initials
-            return cls.search().query(Match(term=term))
+            return cls.search().filter("term", term=term)
 
         def transform_resp(resp):
             labels = list(set(resp.lemma_labels) - {"lemma"})
@@ -57,9 +57,9 @@ class NameVariant(DocType):
                 "lemma-firstname": "firstname",
                 "lemma-patronymic": "patronymic",
                 "lemma-lastname": "lastname",
-                "lemma-firstname-typo": "firstname-typo",
-                "lemma-patronymic-typo": "patronymic-typo",
-                "lemma-lastname-typo": "lastname-typo"
+                "lemma-firstname-typo": "firstname",
+                "lemma-patronymic-typo": "patronymic",
+                "lemma-lastname-typo": "lastname"
             }[labels[0]]
 
             return {

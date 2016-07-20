@@ -1,5 +1,4 @@
 import sys
-import re
 import os.path
 from json import loads
 from elasticsearch_dsl import Index
