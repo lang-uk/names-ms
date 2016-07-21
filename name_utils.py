@@ -412,13 +412,15 @@ def parse_fullname(person_name):
     ['Евлампій', "Ті\'хії"]
     >>> parse_fullname("Нездимовська (Медушевська) Анна Олексіївна")
     ['Нездимовська', 'Медушевська', 'Анна', 'Олексіївна']
+    >>> parse_fullname("П. Д. Петренко")
+    ['П', 'Д', 'Петренко']
     """
     # Extra care for initials (especialy those without space)
     person_name = re.sub("\s+", " ",
                          person_name.
-                         replace(".", ". ").
+                         replace(".", " ").
                          replace("\xa0", " ").
-                         replace(",", ". "))
+                         replace(",", " "))
 
     chunks = re.split(
         TOKENIZE_RX,

@@ -14,7 +14,7 @@ class Matcher(object):
         # double names/lastnames
 
         # islice(1000) is our safety valve against combinatoric explosion
-        for hashes in islice(product(*lemmas), 1000):
+        for hashes in islice(product(*lemmas), 10000000):
             # Very naive generation of variants for now
             yield frozenset(x["lemma"] for x in hashes)
 

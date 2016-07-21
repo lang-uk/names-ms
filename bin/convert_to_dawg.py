@@ -16,12 +16,12 @@ def get_lemma_type(rec):
     assert len(labels) == 1
 
     return {
-        "lemma-firstname": "firstname",
-        "lemma-patronymic": "patronymic",
-        "lemma-lastname": "lastname",
-        "lemma-firstname-typo": "firstname",
-        "lemma-patronymic-typo": "patronymic",
-        "lemma-lastname-typo": "lastname"
+        "lemma-firstname": "f",
+        "lemma-patronymic": "p",
+        "lemma-lastname": "l",
+        "lemma-firstname-typo": "f",
+        "lemma-patronymic-typo": "p",
+        "lemma-lastname-typo": "l"
     }[labels[0]]
 
 
@@ -55,6 +55,12 @@ if __name__ == '__main__':
             dictionary.append(
                 ("%s|%s" % (term, lemma_type), msgpack.packb(rec))
             )
+
+            # Storing also initial letters for names and patronymics
+            if lemma_type in "fp":
+                dictionary.append(
+                    ("%s|%s" % (term[0], lemma_type), msgpack.packb(rec))
+                )
 
             if i and i % 100000 == 0:
                 print("%s records processed" % i)

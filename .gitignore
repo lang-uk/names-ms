@@ -57,3 +57,5 @@ venv
 local_settings.py
 .DS_Store
 .ipynb_checkpoints
+*.dawg
+*.mpack
