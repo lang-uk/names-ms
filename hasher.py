@@ -45,7 +45,7 @@ def batch_request(names):
         else:
             return (({
                 "lemma": sha1((prefix + "thisissalt").encode('utf-8')).hexdigest(),
-                "label": "no-match",
+                "label": "u",  # U is for unknown
                 "term": prefix
             }, ))
 
